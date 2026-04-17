@@ -1,25 +1,33 @@
 import { z } from "zod";
 
+// Trata cadenas vacias como undefined, asi ATLAS_VECTOR_STORE_ID="" en .env
+// no rompe las reglas de min(1) de zod.
+const optStr = () =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() !== "" ? v : undefined));
+
 const schema = z.object({
   PORT: z.coerce.number().default(8080),
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 
-  WHATSAPP_PHONE_ID: z.string().min(1).optional(),
-  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  WHATSAPP_PHONE_ID: optStr(),
+  WHATSAPP_ACCESS_TOKEN: optStr(),
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).default("atlas-verify-token-change-me"),
 
-  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: optStr(),
   OPENAI_CHAT_MODEL: z.string().default("gpt-4.1-mini"),
-  ATLAS_VECTOR_STORE_ID: z.string().min(1).optional(),
+  ATLAS_VECTOR_STORE_ID: optStr(),
   ATLAS_FALLBACK_MODEL: z.string().default("gpt-4o-mini"),
 
-  DATABASE_URL: z.string().min(1).optional(),
+  DATABASE_URL: optStr(),
 
   SMTP_HOST: z.string().default("smtp.gmail.com"),
   SMTP_PORT: z.coerce.number().default(587),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
+  SMTP_USER: optStr(),
+  SMTP_PASS: optStr(),
   ESCALATION_EMAIL_TO: z.string().default("director.educacion@adschool.agency"),
   ESCALATION_EMAIL_FROM: z.string().default("ATLAS <atlas-bot@example.com>"),
 

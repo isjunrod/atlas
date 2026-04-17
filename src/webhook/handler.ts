@@ -64,11 +64,14 @@ async function processInbound(msg: {
     return;
   }
 
-  // fast-path saludos/gracias
-  const canned = fastPath(msg.text);
-  if (canned) {
-    await deliver(session.id, msg.waId, canned);
-    return;
+  // fast-path saludos/gracias — solo cuando el usuario YA completo el intake.
+  // Si esta arrancando, que pase por el flujo normal para capturar programa + email.
+  if (session.intake_stage === "ready") {
+    const canned = fastPath(msg.text);
+    if (canned) {
+      await deliver(session.id, msg.waId, canned);
+      return;
+    }
   }
 
   // intake hibrido

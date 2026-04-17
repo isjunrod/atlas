@@ -33,7 +33,15 @@ app.get("/webhook/whatsapp", (c) => {
 
 // Meta webhook deliver (POST)
 app.post("/webhook/whatsapp", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as MetaWebhookBody;
+  const raw = await c.req.text().catch(() => "");
+  let body: MetaWebhookBody = {};
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    body = {};
+  }
+  // debug: loguear payload completo para ver que envia Meta
+  log.debug("webhook payload recibido", { preview: raw.slice(0, 1200) });
   // responder rapido al webhook (< 5s segun Meta) y procesar en background
   queueMicrotask(() => {
     handleWebhookPayload(body).catch((e) =>

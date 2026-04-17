@@ -24,10 +24,10 @@ function detectEmail(text: string): string | null {
 
 function extractProgramFromReply(text: string): string | null {
   const t = text.toLowerCase().trim();
-  if (/^1\b|^uno\b|^m.?595|^m5|meta ads/.test(t)) return "m595";
-  if (/^2\b|^dos\b|ade|estratega/.test(t)) return "ade";
-  if (/^3\b|^tres\b|academy|academia\.saleads/.test(t)) return "academy";
-  if (/^4\b|^cuatro\b|^saleads|\bplataforma\b/.test(t)) return "saleads";
+  if (/^a\b|^1\b|^uno\b|^m.?595|^m5|meta ads/.test(t)) return "m595";
+  if (/^b\b|^2\b|^dos\b|ade|estratega/.test(t)) return "ade";
+  if (/^c\b|^3\b|^tres\b|academy|academia\.saleads/.test(t)) return "academy";
+  if (/^d\b|^4\b|^cuatro\b|^saleads|\bplataforma\b/.test(t)) return "saleads";
   return detectProgramFromText(text);
 }
 
@@ -57,14 +57,12 @@ export async function runIntake(session: Session, text: string): Promise<IntakeO
     await updateSession(session.id, { ...patch, intake_stage: "asked_program" });
     return {
       reply:
-        "¡Hola! Somos el Equipo de Educacion SaleAds. Para orientarte mejor, cuentanos:\n\n" +
-        "1. ¿A que programa perteneces?\n" +
-        "   *1* M5-95\n" +
-        "   *2* Academia del Estratega (ADE)\n" +
-        "   *3* SaleAds Academy (plataforma gratuita)\n" +
-        "   *4* SaleAds (plataforma de publicidad)\n\n" +
-        "2. Tu correo de compra (si aplica)\n\n" +
-        "3. Tu duda en una o dos lineas",
+        "¡Hola! Somos el *Equipo de Educacion SaleAds*.\n\n" +
+        "Para ayudarte mejor, cuentanos, ¿a que programa perteneces? Responde con la letra:\n\n" +
+        "*A* · M5-95\n" +
+        "*B* · Academia del Estratega (ADE)\n" +
+        "*C* · SaleAds Academy (plataforma gratuita)\n" +
+        "*D* · SaleAds (plataforma de publicidad)",
       continueToAgent: false,
     };
   }
@@ -74,7 +72,7 @@ export async function runIntake(session: Session, text: string): Promise<IntakeO
     if (!prog) {
       return {
         reply:
-          "No te entendimos, ¿nos confirmas el numero del programa? *1* M5-95, *2* ADE, *3* SaleAds Academy, *4* SaleAds.",
+          "No te entendimos, ¿nos confirmas la letra del programa? *A* M5-95, *B* ADE, *C* SaleAds Academy, *D* SaleAds.",
         continueToAgent: false,
       };
     }
