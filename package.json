@@ -1,0 +1,26 @@
+{
+  "name": "atlas",
+  "version": "0.1.0",
+  "description": "ATLAS - Agente de soporte de Equipo de Educacion SaleAds. Primer filtro antes de escalar a humano.",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --target=bun --outfile=dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "migrate": "bun run src/db/migrate.ts",
+    "ingest": "bun run scripts/ingest_kb.ts"
+  },
+  "dependencies": {
+    "hono": "^4.6.11",
+    "openai": "^4.77.0",
+    "postgres": "^3.4.5",
+    "nodemailer": "^6.9.16",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@types/nodemailer": "^6.4.17",
+    "typescript": "^5.7.3"
+  }
+}
