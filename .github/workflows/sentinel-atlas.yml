@@ -1,0 +1,58 @@
+name: Sentinel ATLAS - Health Check
+
+on:
+  schedule:
+    # cada 4 horas
+    - cron: "15 */4 * * *"
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        id: check
+        env:
+          ATLAS_HEALTH_URL: ${{ secrets.ATLAS_HEALTH_URL }}
+        run: |
+          if [ -z "$ATLAS_HEALTH_URL" ]; then
+            echo "ATLAS_HEALTH_URL not configured; skipping"
+            exit 0
+          fi
+          START=$(date +%s%3N)
+          HTTP_CODE=$(curl -sS -o /tmp/atlas-body.json -w "%{http_code}" -m 15 "$ATLAS_HEALTH_URL" || echo "000")
+          END=$(date +%s%3N)
+          ELAPSED=$((END - START))
+          echo "HTTP=$HTTP_CODE elapsed=${ELAPSED}ms"
+          echo "body:"
+          cat /tmp/atlas-body.json || true
+          echo ""
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ATLAS health failed"
+            exit 1
+          fi
+          STATUS=$(grep -o '"status":"[^"]*"' /tmp/atlas-body.json | head -1 || true)
+          case "$STATUS" in
+            *OK*) echo "status OK";;
+            *) echo "status no es OK: $STATUS"; exit 1;;
+          esac
+
+      - name: Enviar alerta si fallo
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "[SENTINEL][ATLAS] Bot de soporte de Educacion NO responde"
+          to: ${{ secrets.ALERT_EMAILS }}
+          from: Sentinel Bot Monitor <${{ secrets.GMAIL_USER }}>
+          body: |
+            ATLAS (bot de soporte del Equipo de Educacion SaleAds) no respondio al health check.
+
+            Accion requerida: verificar el deployment `atlas` en el namespace `atlas` del cluster.
+
+            Detalle: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            -- Sentinel (monitor automatico)
