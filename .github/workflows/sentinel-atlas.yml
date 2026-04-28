@@ -9,6 +9,9 @@ on:
 jobs:
   health-check:
     runs-on: ubuntu-latest
+    # Si el runner no toma el job o se cuelga, fallar rapido y NO disparar alerta
+    # de bot caido (la alerta se ata al output explicito `bot_down`, no a failure()).
+    timeout-minutes: 5
     steps:
       - name: Health check
         id: check
@@ -16,29 +19,42 @@ jobs:
           ATLAS_HEALTH_URL: ${{ secrets.ATLAS_HEALTH_URL }}
         run: |
           if [ -z "$ATLAS_HEALTH_URL" ]; then
-            echo "ATLAS_HEALTH_URL not configured; skipping"
+            echo "ATLAS_HEALTH_URL no configurado; skip"
+            echo "bot_down=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          START=$(date +%s%3N)
-          HTTP_CODE=$(curl -sS -o /tmp/atlas-body.json -w "%{http_code}" -m 15 "$ATLAS_HEALTH_URL" || echo "000")
-          END=$(date +%s%3N)
-          ELAPSED=$((END - START))
-          echo "HTTP=$HTTP_CODE elapsed=${ELAPSED}ms"
-          echo "body:"
-          cat /tmp/atlas-body.json || true
-          echo ""
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "ATLAS health failed"
-            exit 1
-          fi
-          STATUS=$(grep -o '"status":"[^"]*"' /tmp/atlas-body.json | head -1 || true)
-          case "$STATUS" in
-            *OK*) echo "status OK";;
-            *) echo "status no es OK: $STATUS"; exit 1;;
-          esac
 
-      - name: Enviar alerta si fallo
-        if: failure()
+          # 3 intentos con backoff: evita alertar por blips transitorios
+          # (Cloudflare Tunnel reconectando, hiccups DNS, etc.)
+          for attempt in 1 2 3; do
+            START=$(date +%s%3N)
+            HTTP_CODE=$(curl -sS -o /tmp/atlas-body.json -w "%{http_code}" -m 15 "$ATLAS_HEALTH_URL" || echo "000")
+            END=$(date +%s%3N)
+            ELAPSED=$((END - START))
+            echo "intento $attempt: HTTP=$HTTP_CODE elapsed=${ELAPSED}ms"
+            echo "body:"
+            cat /tmp/atlas-body.json || true
+            echo ""
+            STATUS=$(grep -o '"status":"[^"]*"' /tmp/atlas-body.json | head -1 || true)
+            if [ "$HTTP_CODE" = "200" ] && echo "$STATUS" | grep -q OK; then
+              echo "status OK"
+              echo "bot_down=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "fallo intento $attempt; reintentando en 15s..."
+              sleep 15
+            fi
+          done
+
+          echo "ATLAS health fallo despues de 3 intentos"
+          echo "bot_down=true" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      - name: Enviar alerta si bot caido
+        # Gate explicito en el output del check. Esto impide alertas falsas
+        # cuando GitHub no asigna runner, el job se cancela o el step ni corre.
+        if: steps.check.outputs.bot_down == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -49,7 +65,8 @@ jobs:
           to: ${{ secrets.ALERT_EMAILS }}
           from: Sentinel Bot Monitor <${{ secrets.GMAIL_USER }}>
           body: |
-            ATLAS (bot de soporte del Equipo de Educacion SaleAds) no respondio al health check.
+            ATLAS (bot de soporte del Equipo de Educacion SaleAds) no respondio al health check
+            despues de 3 intentos consecutivos.
 
             Accion requerida: verificar el deployment `atlas` en el namespace `atlas` del cluster.
 
