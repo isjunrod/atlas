@@ -60,29 +60,28 @@ async function main() {
 
   const db = sql();
   let inserted = 0;
-  let updated = 0;
+  let skipped = 0;
 
+  // INSERT-only con skip si el slug ya existe. NO pisamos jamas un body
+  // editado por Karen desde el admin. Si querés re-bootstrap-ear desde
+  // cero, primero TRUNCATE kb_documents manualmente (operacion explicita).
   for (const s of sections) {
     const existing = await db<Array<{ id: number }>>`
       SELECT id FROM kb_documents WHERE slug = ${s.slug}
     `;
     if (existing.length > 0) {
-      await db`
-        UPDATE kb_documents SET body = ${s.body}, title = ${s.title},
-          updated_at = now(), updated_by = 'bootstrap'
-        WHERE slug = ${s.slug}
-      `;
-      updated++;
-    } else {
-      await db`
-        INSERT INTO kb_documents (slug, title, body, updated_by)
-        VALUES (${s.slug}, ${s.title}, ${s.body}, 'bootstrap')
-      `;
-      inserted++;
+      log.info(`skip (ya existe): ${s.slug}`);
+      skipped++;
+      continue;
     }
+    await db`
+      INSERT INTO kb_documents (slug, title, body, updated_by)
+      VALUES (${s.slug}, ${s.title}, ${s.body}, 'bootstrap')
+    `;
+    inserted++;
   }
 
-  log.info(`Insertados: ${inserted}, Actualizados: ${updated}`);
+  log.info(`Insertados: ${inserted}, Saltados (ya existian): ${skipped}`);
 
   const all = await db<Array<{ slug: string; title: string }>>`
     SELECT slug, title FROM kb_documents ORDER BY title
