@@ -58,6 +58,7 @@ export async function sendWhatsapp(to: string, body: string): Promise<SendResult
     return { wamids: [], ok: true };
   }
   const parts = splitForWhatsapp(body);
+  log.info("bot reply", { to, parts: parts.length, text: body });
   const wamids: string[] = [];
   for (let i = 0; i < parts.length; i++) {
     const id = await postOne(to, parts[i]!);

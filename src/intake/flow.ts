@@ -31,6 +31,17 @@ function extractProgramFromReply(text: string): string | null {
   return detectProgramFromText(text);
 }
 
+/**
+ * Solo SaleAds (plataforma de pago, opcion D) menciona "compra de SaleAds"
+ * porque es la unica con suscripcion. El resto pide el correo de forma neutral.
+ */
+function askEmailPrompt(program: string | null): string {
+  if (program === "saleads") {
+    return "Perfecto. Ahora el correo con el que hiciste la compra de SaleAds.";
+  }
+  return "Perfecto. Ahora tu correo, por favor.";
+}
+
 export async function runIntake(session: Session, text: string): Promise<IntakeOutcome> {
   const trimmed = text.trim();
   const detectedEmail = detectEmail(trimmed);
@@ -49,8 +60,7 @@ export async function runIntake(session: Session, text: string): Promise<IntakeO
       }
       await updateSession(session.id, { ...patch, intake_stage: "asked_email" });
       return {
-        reply:
-          "¡Hola! Somos el Equipo de Educacion SaleAds. Para ayudarte mejor, nos compartes el correo con el que hiciste tu compra? Luego te respondemos tu duda.",
+        reply: `¡Hola! Somos el *Equipo de Educacion SaleAds*. ${askEmailPrompt(patch.program ?? null)}`,
         continueToAgent: false,
       };
     }
@@ -89,7 +99,7 @@ export async function runIntake(session: Session, text: string): Promise<IntakeO
     }
     await updateSession(session.id, { ...nextPatch, intake_stage: "asked_email" });
     return {
-      reply: "Perfecto. Ahora el correo con el que hiciste la compra.",
+      reply: askEmailPrompt(prog),
       continueToAgent: false,
     };
   }
