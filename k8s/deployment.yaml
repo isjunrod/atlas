@@ -22,8 +22,13 @@ spec:
     spec:
       containers:
       - name: atlas
-        image: juanads/atlas:latest
-        imagePullPolicy: Always
+        # Tag explicito por fecha (no :latest) para que un rollout-restart no
+        # pueda traer una version distinta a la pretendida. Para desplegar:
+        #   docker build -t juanads/atlas:$(date +%Y%m%d-%H%M) -t juanads/atlas:latest .
+        #   docker push juanads/atlas:<TAG> && docker push juanads/atlas:latest
+        #   kubectl -n atlas set image deployment/atlas atlas=juanads/atlas:<TAG>
+        image: juanads/atlas:20260429-1049
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http
