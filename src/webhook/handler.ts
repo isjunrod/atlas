@@ -1,12 +1,50 @@
-import { getOrCreateSession, insertMessage, markWebhookProcessed } from "../db/queries";
+import { getOrCreateSession, insertMessage, markWebhookProcessed, updateSession } from "../db/queries";
 import { runIntake } from "../intake/flow";
 import { classifyIntent } from "../router/classifier";
 import { answerEducacion } from "../handlers/educacion";
 import { escalateToHuman } from "../handlers/escalate";
-import { refundSoftRedirectReply, saleadsRedirectReply } from "../handlers/saleads_redirect";
+import { saleadsRedirectReply } from "../handlers/saleads_redirect";
 import { sendWhatsapp } from "../wa/client";
 import { parseInbound, type MetaWebhookBody } from "../wa/types";
 import { log } from "../logger";
+
+const PROGRAM_MENU = (intro: string) =>
+  `${intro}\n\n` +
+  "*A* · M5-95\n" +
+  "*B* · Academia del Estratega (ADE)\n" +
+  "*C* · SaleAds Academy (plataforma gratuita)\n" +
+  "*D* · SaleAds (plataforma de publicidad)";
+
+// Footer que invita al usuario a seguir, cambiar de programa o cerrar.
+// Se aneja a respuestas terminales (educacion / redirect / escalate) para
+// que el usuario sepa como continuar sin quedar colgado.
+const CONTINUE_FOOTER =
+  "\n\n━━━\n" +
+  "¿Algo mas en lo que te podamos ayudar?\n" +
+  "*A* · Si, tengo otra duda\n" +
+  "*B* · Ver menu de programas\n" +
+  "*C* · No, cerrar conversacion";
+
+function withFooter(body: string): string {
+  if (body.includes("━━━")) return body;
+  return body + CONTINUE_FOOTER;
+}
+
+const CLOSE_REPLY =
+  "Un gusto, *estamos aqui cuando nos necesites*. Si despues tienes otra duda, solo escribenos y volvemos a tomar el caso. 🙌\n\n" +
+  "Equipo de Educacion SaleAds";
+
+// Detector de "A" / "si" cuando la sesion esta en modo post-respuesta,
+// para evitar que "A" se interprete como eleccion de programa M5-95 fuera de contexto.
+function isContinueReply(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return (
+    t === "a" ||
+    t === "si" ||
+    t === "sí" ||
+    /^si[, ]+.*(duda|pregunta|consulta)/i.test(text)
+  );
+}
 
 const GREET_RE = /^(hola|holi|buen[oa]s|saludos|hello|hi)\b/i;
 const THANKS_RE = /^(gracias|muchas gracias|mil gracias|thanks)\b/i;
@@ -67,6 +105,12 @@ async function processInbound(msg: {
   // fast-path saludos/gracias — solo cuando el usuario YA completo el intake.
   // Si esta arrancando, que pase por el flujo normal para capturar programa + email.
   if (session.intake_stage === "ready") {
+    // Respuesta "A" / "si" al footer de continuar. Evita mandarlo al LLM
+    // o interpretarlo como "seleccion de programa".
+    if (isContinueReply(msg.text)) {
+      await deliver(session.id, msg.waId, "¡Claro! Cuentanos tu duda con el mayor detalle posible y la resolvemos.");
+      return;
+    }
     const canned = fastPath(msg.text);
     if (canned) {
       await deliver(session.id, msg.waId, canned);
@@ -89,6 +133,20 @@ async function processInbound(msg: {
   const cls = classifyIntent(msg.text);
   log.info("clasificador", { waId: session.id, intent: cls.intent, tags: cls.tags });
 
+  if (cls.intent === "close_session") {
+    await deliver(session.id, msg.waId, CLOSE_REPLY);
+    return;
+  }
+
+  if (cls.intent === "switch_program") {
+    await updateSession(session.id, { program: null, intake_stage: "asked_program" });
+    const intro = current.program
+      ? "Claro, cambiemos de contexto. ¿Sobre que programa quieres consultar ahora?"
+      : "Claro, aqui van las opciones. ¿A que programa perteneces?";
+    await deliver(session.id, msg.waId, PROGRAM_MENU(intro));
+    return;
+  }
+
   if (cls.intent === "legal_urgent" || cls.intent === "refund_billing") {
     const { reply } = await escalateToHuman({
       sessionId: session.id,
@@ -99,14 +157,12 @@ async function processInbound(msg: {
       tags: cls.tags,
       lastUserMessage: msg.text,
     });
-    // para refund_billing usamos una redireccion suave en vez del escalate reply genérico cuando queremos pedir datos
-    const finalReply = cls.intent === "refund_billing" ? reply : reply;
-    await deliver(session.id, msg.waId, finalReply);
+    await deliver(session.id, msg.waId, withFooter(reply));
     return;
   }
 
   if (cls.intent === "saleads_technical") {
-    await deliver(session.id, msg.waId, saleadsRedirectReply());
+    await deliver(session.id, msg.waId, withFooter(saleadsRedirectReply()));
     return;
   }
 
@@ -118,7 +174,7 @@ async function processInbound(msg: {
       program: current.program,
       email: current.email,
     });
-    await deliver(session.id, msg.waId, out.reply);
+    await deliver(session.id, msg.waId, withFooter(out.reply));
   } catch (e) {
     log.error("answerEducacion fallo, escalando", { error: String(e).slice(0, 300) });
     const { reply } = await escalateToHuman({
@@ -130,7 +186,7 @@ async function processInbound(msg: {
       tags: ["llm_error"],
       lastUserMessage: msg.text,
     });
-    await deliver(session.id, msg.waId, reply);
+    await deliver(session.id, msg.waId, withFooter(reply));
   }
 }
 

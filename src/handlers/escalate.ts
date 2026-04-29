@@ -16,6 +16,8 @@ const SUBJECT_BY_INTENT: Record<Intent, string> = {
   legal_urgent: "[ATLAS][URGENTE][LEGAL] Usuario con amenaza legal",
   refund_billing: "[ATLAS][URGENTE] Reembolso / cobro / cancelacion",
   saleads_technical: "[ATLAS] Usuario agota flujo de soporte tecnico",
+  switch_program: "[ATLAS] Cambio de programa (no deberia escalar)",
+  close_session: "[ATLAS] Cierre de conversacion (no deberia escalar)",
   education: "[ATLAS] Caso educativo que requiere humano",
   unknown: "[ATLAS] Caso sin clasificar",
 };
@@ -27,6 +29,10 @@ const REPLY_BY_INTENT: Record<Intent, string> = {
     "Entendemos tu situacion y lamentamos la experiencia. Ya escalamos tu caso internamente para que le den prioridad. Mientras tanto, te recomendamos formalizar tu solicitud enviando un correo a support@saleads.ai con tu nombre completo, correo de compra, fecha y motivo.\n\nEquipo de Educacion SaleAds",
   saleads_technical:
     "Gracias por escribirnos. Esta linea es exclusiva para temas de educacion, pero como ya no tuviste respuesta por soporte, escalamos tu caso internamente para que te agenden una sesion directa. Nos confirmas tu nombre completo, correo de compra y disponibilidad (9 AM, 1 PM o 6 PM hora Colombia).\n\nEquipo de Educacion SaleAds",
+  switch_program:
+    "Aqui tienes las opciones. Elige el programa desde el menu que acabamos de enviarte.\n\nEquipo de Educacion SaleAds",
+  close_session:
+    "Un gusto, estamos aqui cuando nos necesites.\n\nEquipo de Educacion SaleAds",
   education:
     "Estamos revisando tu caso con el equipo para darte la mejor respuesta. Volvemos contigo en breve.\n\nEquipo de Educacion SaleAds",
   unknown:
